@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embedded Equipment Health & Communication Monitor | BITS Pilani</title>
+  
+  <!-- Modern Human Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for real-time charting -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=2.1">
+</head>
+<body>
+  <!-- Ambient Background Accents -->
+  <div class="ambient-glow glow-primary"></div>
+  <div class="ambient-glow glow-secondary"></div>
+
+  <!-- Top Navigation & Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-badge">
+        <div class="brand-crest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <span class="club-subtitle">Electronics & Robotics Club &bull; BITS Pilani</span>
+          <h1 class="project-title">Embedded Equipment Health & Communication Monitor</h1>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center System Status Badge -->
+    <div class="header-center">
+      <div class="system-status-badge" id="systemStatusBadge" data-status="NORMAL">
+        <span class="status-pulse-dot"></span>
+        <span class="status-label" id="statusLabel">All Systems Healthy</span>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="header-right">
+      <div class="hardware-tags">
+        <div class="hw-tag" id="esp32Conn" title="ESP32 Wireless Gateway Status">
+          <span class="hw-dot"></span>
+          <span class="hw-text">ESP32 Gateway</span>
+        </div>
+        <div class="hw-tag" id="stm32Conn" title="STM32 Physical Bus Link">
+          <span class="hw-dot"></span>
+          <span class="hw-text">STM32 Bus</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Theme Toggle Button (Light / Dark) -->
+        <button id="themeToggleBtn" class="control-btn" title="Toggle Light / Dark Mode">
+          <span id="themeIcon">☀️</span>
+          <span class="btn-label" id="themeLabel">Light</span>
+        </button>
+
+        <!-- Sound Alert Toggle -->
+        <button id="soundToggleBtn" class="control-btn" title="Toggle Audio Chimes">
+          <svg id="soundIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+          <span class="btn-label">Sound</span>
+        </button>
+
+        <!-- Export Dropdown -->
+        <div class="export-dropdown">
+          <button class="control-btn export-btn" id="exportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            <span>Export</span>
+          </button>
+          <div class="dropdown-content">
+            <a href="/api/export?format=csv" download="telemetry.csv">Download Data (CSV)</a>
+            <a href="/api/export?format=json" download="telemetry.json">Download Data (JSON)</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-body">
+
+    <!-- Conversational Human Status Banner -->
+    <section class="human-status-card" id="humanStatusCard" data-status="NORMAL">
+      <div class="status-avatar" id="statusAvatar">🟢</div>
+      <div class="status-narrative">
+        <h2 class="status-heading" id="narrativeHeading">Communication Link is Active and Healthy</h2>
+        <p class="status-paragraph" id="narrativeText">
+          STM32 Node #1 is sending sequenced 64-byte data packets every 500 ms. The monitoring node is acknowledging each transfer promptly in ~45 microseconds. No packet loss detected.
+        </p>
+      </div>
+      <div class="status-context-tags">
+        <span class="context-tag" id="tagCadence">Cadence: 500 ms</span>
+        <span class="context-tag" id="tagTimer">Timer: STM32 TIM2 (1 µs tick)</span>
+        <span class="context-tag" id="tagGateway">Gateway: <span id="gatewayIpDisplay">192.168.1.100</span></span>
+      </div>
+    </section>
+
+    <!-- Row 1: System Architecture Diagram & Fault Lifecycle Stepper -->
+    <section class="card-section">
+      <div class="section-title-bar">
+        <div class="title-with-badge">
+          <span class="title-icon">🧭</span>
+          <h2 class="section-title">System Architecture & Hardware Data Path</h2>
+        </div>
+        <div class="formula-pill" title="Hardware Timer Measurement Principle">
+          <span class="formula-intro">How RTT is calculated:</span>
+          <code class="formula-code">RTT = t<sub>ACK</sub> &minus; t<sub>REQUEST</sub></code>
+          <span class="formula-note">(TIM2 hardware stopwatch)</span>
+        </div>
+      </div>
+
+      <!-- Hardware Architecture Flow (STM32 Master -> ESP32 Gateway -> Dashboard) -->
+      <div class="architecture-flow" id="archDiagram">
+        
+        <!-- Board 1: STM32 Master -->
+        <div class="hw-node" id="nodeStm32Master">
+          <div class="hw-chip-tag">Node #1 &bull; Equipment Master</div>
+          <h3 class="hw-name">STM32F446RE</h3>
+          <p class="hw-role">Sends sequenced 64-byte flits & measures microsecond RTT latency.</p>
+          <div class="hw-foot">
+            <span class="pin-badge">PA4-PA7 SPI &bull; Blue Button PC13</span>
+            <span class="status-mini-tag text-emerald">Active</span>
+          </div>
+        </div>
+
+        <!-- Link 1: High-Speed SPI -->
+        <div class="hw-link" id="busLink1">
+          <div class="wire-track">
+            <div class="wire-packet packet-outgoing" id="reqTracer" title="Outgoing Flit"></div>
+            <div class="wire-packet packet-incoming" id="ackTracer" title="Incoming ACK"></div>
+          </div>
+          <div class="wire-labels">
+            <span class="wire-name">SPI Bus (Full Duplex DMA)</span>
+            <span class="wire-protocol">64-Byte Flit ➔ / ⬅ ACK Heartbeat</span>
+          </div>
+        </div>
+
+        <!-- Board 2: ESP32 Gateway & Slave -->
+        <div class="hw-node" id="nodeEsp32">
+          <div class="hw-chip-tag">Node #2 &bull; SPI Slave & Gateway</div>
+          <h3 class="hw-name">ESP32 DevKit</h3>
+          <p class="hw-role">Hardware SPI Slave, Heartbeat Watchdog & Wi-Fi Bridge.</p>
+          <div class="hw-foot">
+            <span class="pin-badge">GPIO 18, 19, 23, 5 &bull; Core 0</span>
+            <span class="status-mini-tag text-emerald" id="nodeSlaveMetric">ACK Confirmed</span>
+          </div>
+        </div>
+
+        <!-- Link 2: Wi-Fi -->
+        <div class="hw-link" id="busLink3">
+          <div class="wire-track">
+            <div class="wire-packet packet-wifi" id="wifiTracer"></div>
+          </div>
+          <div class="wire-labels">
+            <span class="wire-name">Wi-Fi LAN Telemetry</span>
+            <span class="wire-protocol">HTTP POST &bull; SSE Stream</span>
+          </div>
+        </div>
+
+        <!-- Destination: Web Dashboard -->
+        <div class="hw-node current-node" id="nodeDashboard">
+          <div class="hw-chip-tag">Web Application</div>
+          <h3 class="hw-name">Live Dashboard</h3>
+          <p class="hw-role">Real-time telemetry display, latency tracking & diagnostics.</p>
+          <div class="hw-foot">
+            <span class="pin-badge">Port 5000</span>
+            <span class="status-mini-tag text-emerald">Connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Human Fault Detection State Stepper (Direct from Poster) -->
+      <div class="lifecycle-bar">
+        <div class="lifecycle-intro">
+          <span class="intro-label">Fault Detection Progression:</span>
+          <span class="intro-desc">How the system detects and recovers from dropped connections</span>
+        </div>
+        <div class="lifecycle-stepper">
+          <div class="step-card active" id="stepNormal">
+            <div class="step-icon-wrap">
+              <span class="step-icon">🟢</span>
+            </div>
+            <div class="step-info">
+              <span class="step-title">1. Normal Operation</span>
+              <span class="step-desc">Heartbeats received every 500 ms</span>
+            </div>
+          </div>
+
+          <div class="step-arrow">➔</div>
+
+          <div class="step-card" id="stepFault">
+            <div class="step-icon-wrap">
+              <span class="step-icon">🔴</span>
+            </div>
+            <div class="step-info">
+              <span class="step-title">2. Fault Detected</span>
+              <span class="step-desc">Heartbeat timeout (> 2.0s without ACK)</span>
+            </div>
+          </div>
+
+          <div class="step-arrow">➔</div>
+
+          <div class="step-card" id="stepRecovered">
+            <div class="step-icon-wrap">
+              <span class="step-icon">🟡</span>
+            </div>
+            <div class="step-info">
+              <span class="step-title">3. Link Recovered</span>
+              <span class="step-desc">First valid ACK received; link restored</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 2: Human-Friendly Key Metrics Cards -->
+    <section class="metrics-grid">
+      
+      <!-- Card 1: Response Time (RTT) -->
+      <div class="metric-card primary-highlight" id="cardLatency">
+        <div class="card-top">
+          <div class="card-caption">
+            <span class="metric-title">Round-Trip Response Time</span>
+            <span class="metric-subtitle">Time taken to send request & receive ACK</span>
+          </div>
+          <span class="badge badge-teal" id="rttQualityBadge">⚡ Lightning Fast</span>
+        </div>
+        <div class="metric-center">
+          <div class="big-number-group">
+            <span class="big-number" id="valLatency">45.2</span>
+            <span class="big-unit">&micro;s</span>
+          </div>
+          <!-- Human Gauge Bar -->
+          <div class="human-meter">
+            <div class="meter-bar" id="latencyGaugeBar" style="width: 25%;"></div>
+          </div>
+          <div class="meter-labels">
+            <span>0 ms (Ideal)</span>
+            <span>30 ms (Nominal)</span>
+            <span>60 ms+ (Warning)</span>
+          </div>
+        </div>
+        <div class="card-bottom">
+          <div class="stat-pill">
+            <span class="pill-k">Best:</span>
+            <span class="pill-v" id="valMinLatency">42.0 &micro;s</span>
+          </div>
+          <div class="stat-pill">
+            <span class="pill-k">Average:</span>
+            <span class="pill-v" id="valAvgLatency">45.8 &micro;s</span>
+          </div>
+          <div class="stat-pill">
+            <span class="pill-k">Peak:</span>
+            <span class="pill-v" id="valMaxLatency">58.4 &micro;s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Packet Sequence & Flit Count -->
+      <div class="metric-card" id="cardFlit">
+        <div class="card-top">
+          <div class="card-caption">
+            <span class="metric-title">Message Packet Sequence</span>
+            <span class="metric-subtitle">Sequenced 64-byte payload transfers</span>
+          </div>
+          <span class="badge badge-blue" id="transferRateBadge">2.0 pkts/sec</span>
+        </div>
+        <div class="metric-center">
+          <div class="big-number-group">
+            <span class="big-prefix">#</span>
+            <span class="big-number" id="valFlitNumber">0</span>
+          </div>
+          <div class="human-progress-bar">
+            <div class="progress-stream" id="flitPulseBar"></div>
+          </div>
+          <div class="metric-annotation">
+            <span>Payload: <strong>64 Bytes</strong></span>
+            <span>Uptime: <strong id="valUptime">00:00:00</strong></span>
+          </div>
+        </div>
+        <div class="card-bottom">
+          <div class="stat-pill">
+            <span class="pill-k">Total Sent:</span>
+            <span class="pill-v" id="valTotalFlits">0 flits</span>
+          </div>
+          <div class="stat-pill">
+            <span class="pill-k">Integrity:</span>
+            <span class="pill-v text-emerald">Verified</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Heartbeat & Cadence -->
+      <div class="metric-card" id="cardAck">
+        <div class="card-top">
+          <div class="card-caption">
+            <span class="metric-title">Heartbeat & Inter-ACK Interval</span>
+            <span class="metric-subtitle">Time elapsed between consecutive ACKs</span>
+          </div>
+          <span class="badge badge-emerald" id="ackStatusBadge">ACK Confirmed</span>
+        </div>
+        <div class="metric-center">
+          <div class="big-number-group">
+            <span class="big-number" id="valAckInterval">500</span>
+            <span class="big-unit">ms</span>
+          </div>
+          <div class="cadence-note" id="cadenceText">
+            🟢 Steady Heartbeat Cadence (~2 per second)
+          </div>
+          <div class="metric-annotation">
+            <span>Jitter: <strong id="valJitter">&plusmn;1.2 ms</strong></span>
+            <span>Timeout limit: <strong>2000 ms</strong></span>
+          </div>
+        </div>
+        <div class="card-bottom">
+          <div class="stat-pill">
+            <span class="pill-k">Total ACKs:</span>
+            <span class="pill-v" id="valTotalAcks">0 received</span>
+          </div>
+          <div class="stat-pill">
+            <span class="pill-k">Status:</span>
+            <span class="pill-v text-emerald">Synchronized</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Health & Reliability -->
+      <div class="metric-card" id="cardReliability">
+        <div class="card-top">
+          <div class="card-caption">
+            <span class="metric-title">Link Health & Reliability</span>
+            <span class="metric-subtitle">Communication success rate & packet drops</span>
+          </div>
+          <span class="badge badge-emerald" id="healthScoreBadge">100% Reliable</span>
+        </div>
+        <div class="metric-center">
+          <div class="big-number-group">
+            <span class="big-number" id="valPacketLoss">0.0</span>
+            <span class="big-unit">% loss</span>
+          </div>
+          <div class="human-meter">
+            <div class="meter-bar meter-emerald" id="healthFill" style="width: 100%;"></div>
+          </div>
+          <div class="metric-annotation">
+            <span>Packet drops: <strong id="lossText">0 drops</strong></span>
+            <span>Fault incidents: <strong id="valFaultCount">0 events</strong></span>
+          </div>
+        </div>
+        <div class="card-bottom">
+          <div class="stat-pill">
+            <span class="pill-k">Link Score:</span>
+            <span class="pill-v text-emerald" id="linkIntegrity">100% (Optimal)</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Row 3: Live Real-Time Charts -->
+    <section class="charts-row">
+      
+      <!-- Chart 1: Latency Timeline -->
+      <div class="chart-box">
+        <div class="chart-top-bar">
+          <div class="chart-title-group">
+            <span class="chart-dot dot-teal"></span>
+            <div>
+              <h3 class="chart-heading">Real-Time Round-Trip Response Time (RTT)</h3>
+              <p class="chart-sub">Measured per request in microseconds (&micro;s) &bull; Target: &lt; 80 &micro;s</p>
+            </div>
+          </div>
+          <div class="chart-actions">
+            <button class="small-btn" id="chart1PauseBtn">Pause</button>
+            <button class="small-btn" id="chart1ResetBtn">Reset</button>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="latencyChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Inter-ACK Cadence -->
+      <div class="chart-box">
+        <div class="chart-top-bar">
+          <div class="chart-title-group">
+            <span class="chart-dot dot-amber"></span>
+            <div>
+              <h3 class="chart-heading">Heartbeat Cadence & Interval Between ACKs</h3>
+              <p class="chart-sub">Expected arrival period: ~500 ms &bull; Timeout threshold: 2000 ms</p>
+            </div>
+          </div>
+          <div class="chart-actions">
+            <span class="badge badge-amber">Target: 500 ms</span>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="intervalChart"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Row 4: Fault Injection Panel & Live Event Feed -->
+    <section class="interactive-row">
+      
+      <!-- Fault Injection Demonstrator -->
+      <div class="action-panel">
+        <div class="panel-top">
+          <div class="panel-title-group">
+            <span class="panel-icon">⚡</span>
+            <div>
+              <h3 class="panel-title">Fault Injection Control</h3>
+              <p class="panel-sub">Trigger real-time communication fault & observe recovery.</p>
+            </div>
+          </div>
+          <span class="badge badge-purple">Open Day Demo</span>
+        </div>
+
+        <div class="action-buttons-grid" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Single Interactive Fault Toggle Button -->
+          <button class="human-btn btn-inject-fault" id="btnToggleFault" data-action="toggle" style="width: 100%; padding: 1.1rem 1.4rem; justify-content: flex-start;">
+            <span class="btn-emoji" id="toggleFaultEmoji" style="font-size: 1.8rem;">🔌</span>
+            <div class="btn-texts" style="text-align: left;">
+              <span class="btn-primary-text" id="toggleFaultTitle" style="font-size: 1.05rem; font-weight: 700;">Simulate Communication Fault</span>
+              <span class="btn-secondary-text" id="toggleFaultDesc">Injects heartbeat timeout (FAULT) & triggers alert state</span>
+            </div>
+          </button>
+
+          <!-- Hardware Button Info Card -->
+          <div style="background: rgba(2, 132, 199, 0.08); border: 1px dashed var(--primary-500); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 2rem;">🎮</span>
+            <div>
+              <h4 style="margin: 0 0 0.25rem 0; font-size: 0.95rem; color: var(--text-primary); font-weight: 700;">Hardware Fault via Nucleo Pushbutton:</h4>
+              <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                Press & hold the <strong>Blue Button (B1 / PC13)</strong> on the STM32 board. It halts SPI flits, immediately triggering the ESP32 heartbeat timeout and turning the dashboard <strong>RED</strong>. Release to recover!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Stream Peek -->
+        <div class="telemetry-peek" style="margin-top: 1rem;">
+          <div class="peek-header">
+            <span>LIVE TELEMETRY STREAM (FROM ESP32 / STM32):</span>
+            <span class="live-pill">LIVE FEED</span>
+          </div>
+          <div class="peek-content" id="rawPayloadView">Listening for telemetry...</div>
+        </div>
+      </div>
+
+      <!-- Human-Friendly Event Activity Log -->
+      <div class="activity-panel">
+        <div class="panel-top">
+          <div class="panel-title-group">
+            <span class="panel-icon">📜</span>
+            <div>
+              <h3 class="panel-title">System Activity & Event History</h3>
+              <p class="panel-sub">Real-time log of state transitions, faults, and heartbeats.</p>
+            </div>
+          </div>
+          <div class="log-filter-pills">
+            <button class="filter-btn active" data-filter="ALL">All</button>
+            <button class="filter-btn" data-filter="FAULT">Faults</button>
+            <button class="filter-btn" data-filter="RECOVERY">Recoveries</button>
+            <button class="filter-btn" data-filter="WARNING">Warnings</button>
+          </div>
+        </div>
+
+        <div class="activity-table-container">
+          <table class="activity-table">
+            <thead>
+              <tr>
+                <th style="width: 130px;">Time</th>
+                <th style="width: 95px;">Status</th>
+                <th style="width: 180px;">Event Title</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="activity-footer">
+          <label class="checkbox-container">
+            <input type="checkbox" id="autoScrollCheck" checked>
+            <span>Auto-scroll to latest updates</span>
+          </label>
+          <button class="text-link-btn" id="clearLogsBtn">Clear History</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Row 5: "How It Works" Friendly Explainer Accordion -->
+    <section class="card-section explainer-section">
+      <div class="section-title-bar">
+        <div class="title-with-badge">
+          <span class="title-icon">💡</span>
+          <h2 class="section-title">Open Day Project Guide & How It Works</h2>
+        </div>
+        <span class="badge badge-teal">Project Documentation</span>
+      </div>
+
+      <div class="explainer-cards">
+        <div class="explainer-item">
+          <div class="explainer-icon">⏱️</div>
+          <div class="explainer-content">
+            <h4>1. Hardware Timer Latency Measurement</h4>
+            <p>
+              In safety-critical robotics and automotive systems, predictable latency is paramount. Here, STM32's hardware timer <code>TIM2</code> is configured with a 32 MHz prescaler to tick once every microsecond. It records <code>t_REQUEST</code> right before clocking out the SPI packet, and records <code>t_ACK</code> the moment the slave returns <code>'A','C','K'</code>. The difference gives the true hardware Round-Trip Time ($RTT$).
+            </p>
+          </div>
+        </div>
+
+        <div class="explainer-item">
+          <div class="explainer-icon">🛡️</div>
+          <div class="explainer-content">
+            <h4>2. Fault Detection & Automatic Recovery</h4>
+            <p>
+              The equipment node and monitoring node maintain a 500 ms heartbeat cadence. If a wire is severed or a node resets, the ESP32 gateway notices the silence. If no heartbeat arrives for > 2000 ms, the system enters <code>FAULT</code> mode and logs the event. Once the connection is reconnected, the very next valid packet triggers <code>RECOVERED</code>, restoring operations smoothly.
+            </p>
+          </div>
+        </div>
+
+        <div class="explainer-item">
+          <div class="explainer-icon">📡</div>
+          <div class="explainer-content">
+            <h4>3. Wireless Gateway & Web Dashboard</h4>
+            <p>
+              Instead of needing a debug cable plugged into a PC, the ESP32 acts as a standalone wireless gateway. It listens to the STM32 via high-speed UART (115200 baud), calculates statistics like jitter and packet loss, and streams JSON data over Wi-Fi directly to this live web interface.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Clean Human Footer -->
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <div class="footer-left-content">
+        <strong>Electronics & Robotics Club</strong> &bull; BITS Pilani &bull; Open Day Demonstration
+      </div>
+      <div class="footer-right-content">
+        Developed for STM32F446RE and ESP32 Unified Telemetry Gateway
+      </div>
+    </div>
+  </footer>
+
+  <!-- Controller Script -->
+  <script src="/static/js/dashboard.js?v=2.1"></script>
+</body>
+</html>

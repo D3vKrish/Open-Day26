@@ -1,0 +1,32 @@
+# Build output & binaries
+Debug/
+Release/
+build/
+bin/
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.d
+*.su
+*.map
+
+# IDE files
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+.env
+venv/
+ENV/
+
+# Arduino build artifacts
+*.tmp
+*.bak
